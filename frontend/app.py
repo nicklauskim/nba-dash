@@ -10,7 +10,7 @@ from callbacks import register_callbacks
 # Initialize app with a Bootstrap theme
 app = dash.Dash(__name__, 
                 external_stylesheets=[
-                    dbc.themes.QUARTZ,
+                    dbc.themes.SANDSTONE,
                     "https://cdn.jsdelivr.net/npm/ag-grid-community/styles/ag-grid.css",
                     "https://cdn.jsdelivr.net/npm/ag-grid-community/styles/ag-theme-alpine.css"
                 ],

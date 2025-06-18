@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import date
 
 
@@ -13,7 +13,7 @@ class FilterRequest(BaseModel):
     """
     season: Optional[int] = None
     season_type: Optional[int] = None
-    player: Optional[int] = None
+    player: Optional[List[int]] = None
     team: Optional[str] = None
     opponent: Optional[str] = None
     start_date: Optional[date] = None

@@ -2,6 +2,8 @@
 
 import numpy as np
 import plotly.graph_objects as go
+import plotly.express as px
+from scipy.stats import gaussian_kde
 
 
 def formatted_table(data):
@@ -9,19 +11,27 @@ def formatted_table(data):
 
 
 def draw_nba_half_court():
-    # Plotting!
     fig = go.Figure()
-    
-    # fig.update_traces(marker={'size': 10})
-    fig.update_layout(plot_bgcolor="#F8F8F8", autosize=False, 
-                      height=650, width=650, 
-                      xaxis_title=None, yaxis_title=None, 
-                      xaxis_range=[-250, 250], yaxis_range=[0, 470], 
-                      xaxis_visible=False, yaxis_visible=False,
-                      xaxis_showgrid=False, yaxis_showgrid=False,
-                      yaxis_zeroline=False,
-                      margin={'t':50,'l':50,'b':50,'r':50},
-                      showlegend=False
+
+    fig.update_layout(
+        plot_bgcolor="#F8F8F8",
+        autosize=False,
+        font=dict(family="Inter", size=14),
+        height=650, width=650,
+        xaxis=dict(
+            visible=False,
+            range=[-250, 250],
+            scaleanchor='y',
+            scaleratio=1,
+            fixedrange=True
+        ),
+        yaxis=dict(
+            visible=False,
+            range=[0, 470],
+            fixedrange=True
+        ),
+        margin=dict(l=20, r=20, t=50, b=20),
+        showlegend=False
     )
     
     # Draw court lines
@@ -116,28 +126,102 @@ def draw_nba_half_court():
     return fig
 
 
-def plot_events(df, fig, **kwargs):    # shots or rebounds or ...
-    color_dict = {}
-    
+def plot_events(df, fig, title="Play Chart", **kwargs):
     x = df['xlegacy']
-    y = df['ylegacy'].map(lambda y: y + 40)    # adjust y-coordinates to match court layout
-
+    y = df['ylegacy'] + 40  # Align with half-court
 
     fig.add_trace(go.Scatter(
         x=x,
         y=y,
         mode='markers',
-        marker=dict(size=8, color='orange', opacity=0.7),
+        marker=dict(size=8, color='orange', opacity=0.7, line=dict(width=1, color='black')),
         name='Events',
         hoverinfo='text',
         text=df['actiontype'] + ' ' + df['shot_distance'].astype(str) + ' ft.' + '<br>' + df['subtype']
     ))
 
+    fig.update_layout(
+        title=dict(
+            text=title,
+            x=0.5,
+            xanchor="center",
+            font=dict(size=20, family='Inter')
+        )
+    )
+
     return fig
 
 
-def shot_type_heatmap(df, **kwargs):
-    pass
+def shot_type_heatmap(df, fig, title="Play Location Density Heatmap", **kwargs):
+    from scipy.stats import gaussian_kde
+    import numpy as np
+    import plotly.graph_objects as go
+
+    df = df.rename(columns={'xlegacy': 'X', 'ylegacy': 'Y'})
+    df['Y'] += 40  # Align with half-court layout
+
+    df = df[(df['X'] >= -250) & (df['X'] <= 250) & (df['Y'] >= 0) & (df['Y'] <= 470)]
+
+    x = df['X'].values
+    y = df['Y'].values
+
+    # KDE smoothing
+    kde = gaussian_kde(np.vstack([x, y]), bw_method=0.3)
+
+    xi, yi = np.mgrid[-250:250:300j, 0:470:300j]  # xi is x (width), yi is y (height)
+    zi = kde(np.vstack([xi.ravel(), yi.ravel()])).reshape(xi.shape)
+
+    # Smooth, clip extreme values
+    zi = np.sqrt(zi)
+    z_cap = np.percentile(zi, 99)
+    zi = np.clip(zi, 0, z_cap)
+
+    fig = go.Figure(data=go.Heatmap(
+        x=xi[:, 0],      
+        y=yi[0],       
+        z=zi.T,        
+        colorscale='Bluered',    # 'Viridis', 'Cividis', 'Blues', 'Reds', etc.
+        zsmooth='best',
+        hoverinfo='skip',
+        showscale=False,
+        colorbar=dict(
+            title='Density',
+            ticklen=3,
+            thickness=15,
+            outlinewidth=0,
+        ),
+        **kwargs
+    ))
+
+    fig.update_layout(
+        autosize=False,
+        height=650,
+        width=650,
+        margin=dict(l=20, r=20, t=50, b=20),
+        xaxis=dict(
+            visible=False,
+            range=[-250, 250],
+            scaleanchor="y",
+            scaleratio=1,
+            fixedrange=True
+        ),
+        yaxis=dict(
+            visible=False,
+            range=[0, 470],
+            fixedrange=True
+        ),
+        plot_bgcolor='white',
+        font=dict(family="Inter", size=14),
+        title=dict(
+            text=title,
+            x=0.5,
+            xanchor='center',
+            font=dict(size=20, family='Inter')
+        )
+    )
+
+    return fig
+
 
 
 def shot_type_bar_chart(df, **kwargs):
@@ -145,4 +229,17 @@ def shot_type_bar_chart(df, **kwargs):
 
 
 
+
+def scoring_timeline(df):
+    df_sorted = df.sort_values(by="game_minute")
+    df_sorted["cumulative_points"] = df_sorted["points"].cumsum()
+    
+    fig = px.line(
+        df_sorted, 
+        x="game_minute", 
+        y="cumulative_points", 
+        title="Scoring Timeline",
+        labels={"game_minute": "Game Minute", "cumulative_points": "Cumulative Points"}
+    )
+    return fig
 

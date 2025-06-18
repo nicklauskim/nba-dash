@@ -172,8 +172,10 @@ def get_filtered_playbyplay(filters: FilterRequest):
     parameters = {}
 
     if filters.player:
-        conditions.append("personid = :player")
-        parameters["player"] = filters.player
+        placeholders = ", ".join([f":player_{i}" for i in range(len(filters.player))])
+        conditions.append(f"personid IN ({placeholders})")
+        for i, pid in enumerate(filters.player):
+            parameters[f"player_{i}"] = pid
     # if filters.team:
     #     conditions.append("teamid = :team")
     #     parameters["team"] = filters.team
@@ -190,8 +192,13 @@ def get_filtered_playbyplay(filters: FilterRequest):
         conditions.append("gamedate <= :end_date")
         parameters["end_date"] = filters.end_date
     if filters.action_type:
-        conditions.append("TRIM(actiontype) = :action_type")
-        parameters["action_type"] = filters.action_type
+        if filters.action_type == "ALL_SHOTS":
+            conditions.append("TRIM(actiontype) IN (:made, :missed)")
+            parameters["made"] = "Made Shot"
+            parameters["missed"] = "Missed Shot"
+        else:
+            conditions.append("TRIM(actiontype) = :action_type")
+            parameters["action_type"] = filters.action_type
     
     final_query = base_query + " AND \n" + " AND \n".join(conditions)
     # ORDER BY?

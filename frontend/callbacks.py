@@ -1,9 +1,11 @@
+import dash
 from dash import Input, Output, State, ctx, html, dcc, dash_table 
 from dash.exceptions import PreventUpdate
 from dash_ag_grid import AgGrid
 from layout import landing_page, filter_page, visualization_page
 from utils import draw_nba_half_court, plot_events, shot_type_heatmap, shot_type_bar_chart
 import requests
+from datetime import date
 import pandas as pd
 import plotly.express as px
 
@@ -40,6 +42,7 @@ def register_callbacks(app):
     # Filters → Visuals navigation + fetch filtered data
     @app.callback(
         Output("filtered-data-store", "data"),
+        Output("filter-store", "data"),
         Output("url", "pathname"),
         Output("dummy-submit-output", "children"),
         Input("submit-filters-btn", "n_clicks"),
@@ -75,8 +78,37 @@ def register_callbacks(app):
             response = requests.get("http://localhost:8000/api/get_filtered_data")
             data = response.json()
             # Store in cache or session if needed
-            return data, "/visuals", "done"
+
+            # Prepare human-readable filter metadata
+            summary = {
+                "player_name": player,
+                "season": season,
+                "team": team,
+                "season_type": "Regular" if season_type == 0 else "Playoffs",
+                "date_range": [start_date, end_date],
+                "action_type": action_type
+            }
+            return data, summary, "/visuals", "done"
         raise PreventUpdate
+
+    # Filter dropdowns
+    # Update player/team options based on season
+    @app.callback(
+        Output("date-range", "start_date"),
+        Output("date-range", "end_date"),
+        Input("season-dropdown", "value"),
+        prevent_initial_call=True
+    )
+    def update_date_range(season):
+        if season:
+            # NBA regular seasons typically start in October and end in April
+            # Playoffs go through June
+            start = date(season, 10, 1)
+            end = date(season + 1, 6, 30)
+            return start, end
+        return dash.no_update, dash.no_update
+    
+
 
     # Visuals: Render plots and table (could be refined to use dcc.Store)
     @app.callback(
@@ -86,20 +118,25 @@ def register_callbacks(app):
         Output("performance-graph", "figure"),
         Output("data-table", "children"),
         Input("filtered-data-store", "data"),
+        Input("filter-store", "data")
     )
-    def load_visuals(data):
+    def load_visuals(data, filters):
         if not data:
             return px.scatter(title="No data"), px.scatter(), "No results"
 
         # Display player name and some filters at top of page
+        player_name = filters.get("player_name", "All Players")
+        season = filters.get("season", "All Seasons")
+        action_type = filters.get("action_type", "All Actions")
 
+        player_header = f"{player_name}: {action_type}s, {season}"
 
         df = pd.DataFrame(data).sort_values(by=["gamedate", "eventnum"], ascending=True)
 
         # 1. Shot chart 2. Area/zones
         fig1 = plot_events(df, draw_nba_half_court())
 
-        fig2 = plot_events(df, draw_nba_half_court())
+        fig2 = shot_type_heatmap(df, draw_nba_half_court())
 
         # Define column definitions with custom options
         column_defs = [
@@ -133,6 +170,23 @@ def register_callbacks(app):
 
         return fig1, fig2, table
 
+
+    @app.callback(
+    Output("filter-summary", "children"),
+    Input("filter-store", "data")
+    )
+    def update_filter_summary(data):
+        if not data:
+            return ""
+        player = data.get("player_name", "All Players")
+        season = data.get("season", "All Seasons")
+        team = data.get("team", "All Teams")
+        season_type = data.get("season_type", "Any")
+        action_type = data.get("action_type", "All Actions")
+        start_date, end_date = data.get("date_range", ["-", "-"])
+        return f"{player} | Season: {season} | Team: {team} | Type: {season_type} | Dates: {start_date} to {end_date} | Action: {action_type}"
+
+
     # Show/hide filters section
     @app.callback(
         Output("url", "pathname", allow_duplicate=True),
@@ -157,3 +211,28 @@ def register_callbacks(app):
             return {"display": "block"}
         return {"display": "none"}
     
+
+    # VIDEO PLAYER
+    # @app.callback(
+    #     Output("video-player", "children"),
+    #     Input("next-clip-button", "n_clicks"),
+    #     State
+    # )
+    # def load_video(n_clicks, data):
+    #     if not data:
+    #         raise PreventUpdate
+        
+    #     clips = [row["video_url"] for row in data if row.get("video_url", "").endswith(".mp4")]
+    #     if not clips:
+    #         return html.Div("No video clips available for selected filters.")
+        
+    #     index = n_clicks % len(clips)
+    #     selected_clip = clips[index]
+
+    #     return html.Video(
+    #         src=selected_clip,
+    #         controls=True,
+    #         autoPlay=True,
+    #         style={"width": "100%", "maxWidth": "720px", "height": "auto"}
+    #     )
+        
