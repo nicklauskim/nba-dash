@@ -192,16 +192,36 @@ def get_filtered_playbyplay(filters: FilterRequest):
         conditions.append("gamedate <= :end_date")
         parameters["end_date"] = filters.end_date
     if filters.action_type:
-        if filters.action_type == "ALL_SHOTS":
+        if filters.action_type == "ALL SHOTS":
             conditions.append("TRIM(actiontype) IN (:made, :missed)")
             parameters["made"] = "Made Shot"
             parameters["missed"] = "Missed Shot"
         else:
             conditions.append("TRIM(actiontype) = :action_type")
             parameters["action_type"] = filters.action_type
+
+    # if filters.two_three:
+    #     if filters.two_three == "ALL":
+            # conditions.append("TRIM(shotvalue) IN (:two, :three)")
+    #         parameters["two"] = 2
+    #         parameters["three"] = 3  
+    #     conditions.append("TRIM(shotvalue) = :two_three")
+    #     parameters["two_three"] = filters.two_three
+
+    # if filters.quarter:
+    #     conditions.append("period = :quarter")
+    #     parameters["quarter"] = filters.quarter
+
+    # if filters.start_gametime:
+    #     conditions.append("starttime >= :start_gametime")
+    #     parameters["start_gametime"] = filters.start_gametime
+    # if filters.end_gametime:
+    #     conditions.append("endtime <= :end_gametime")
+    #     parameters["end_gametime"] = filters.end_gametime
+
     
-    final_query = base_query + " AND \n" + " AND \n".join(conditions)
-    # ORDER BY?
+    final_query = base_query + " AND \n" + " AND \n".join(conditions) + " ORDER BY game_id, eventnum"
+    
     print(final_query)
     print(parameters)
 

@@ -1,5 +1,5 @@
 import dash
-from dash import Input, Output, State, ctx, html, dcc, dash_table 
+from dash import Input, Output, State, ctx, html, dcc, dash_table , no_update
 from dash.exceptions import PreventUpdate
 from dash_ag_grid import AgGrid
 from layout import landing_page, filter_page, visualization_page
@@ -136,7 +136,7 @@ def register_callbacks(app):
         # 1. Shot chart 2. Area/zones
         fig1 = plot_events(df, draw_nba_half_court())
 
-        fig2 = shot_type_heatmap(df, draw_nba_half_court())
+        fig2 = shot_type_heatmap(df)
 
         # Define column definitions with custom options
         column_defs = [
@@ -199,40 +199,48 @@ def register_callbacks(app):
         raise PreventUpdate
 
 
-    # Show/hide video player
+    # Video player
     @app.callback(
-        Output("video-player-section", "style"),
+        Output("video-player-section", "children"),
         Input("show-video-btn", "n_clicks"),
         Input("filtered-data-store", "data"),
+        Input("autoplay-toggle", "value"),
         prevent_initial_call=True
     )
-    def show_video(n, data):
-        if n % 2 == 1:
-            return {"display": "block"}
-        return {"display": "none"}
-    
+    def load_video_section(n, data, autoplay):
+        if not data:
+            return html.Div("No filtered data to show.")
 
-    # VIDEO PLAYER
-    # @app.callback(
-    #     Output("video-player", "children"),
-    #     Input("next-clip-button", "n_clicks"),
-    #     State
-    # )
-    # def load_video(n_clicks, data):
-    #     if not data:
-    #         raise PreventUpdate
-        
-    #     clips = [row["video_url"] for row in data if row.get("video_url", "").endswith(".mp4")]
-    #     if not clips:
-    #         return html.Div("No video clips available for selected filters.")
-        
-    #     index = n_clicks % len(clips)
-    #     selected_clip = clips[index]
+        df = pd.DataFrame(data).sort_values(by=["gamedate", "eventnum"], ascending=True)
+        urls = [row["url"] for row in df if isinstance(row["url"], str) and row["url"].endswith(".mp4")]
 
-    #     return html.Video(
-    #         src=selected_clip,
-    #         controls=True,
-    #         autoPlay=True,
-    #         style={"width": "100%", "maxWidth": "720px", "height": "auto"}
-    #     )
+        # urls = [row["url"] for row in data if isinstance(row.get("url"), str) and row["url"].endswith(".mp4")]
+        if not urls:
+            return html.Div("No video clips found.")
         
+        print("▶️ Video URLs passed to backend:", urls)
+
+        if autoplay == "combined":
+            resp = requests.post("http://localhost:8000/api/generate_video", json={"urls": urls})
+            if resp.status_code != 200 or resp.json().get("status") != "success":
+                return html.Div("Error generating video.")
+
+            video_url = resp.json()["video_path"]
+            print(f"http://localhost:8000{video_url}")
+            return html.Div([
+                html.Video(src=f"http://localhost:8000{video_url}", controls=True, autoPlay=True,
+                           style={"width": "100%", "maxWidth": "720px"}),
+                html.Br(),
+                html.A("Download Video", href=f"http://localhost:8000{video_url}", download="combined_video.mp4",
+                       className="btn btn-secondary")
+            ])
+
+        else:
+            # Manual playback mode
+            return html.Div([
+                html.Video(id="video-player", controls=True, autoPlay=True, style={"width": "100%", "maxWidth": "720px"}),
+                html.Button("Next Clip", id="next-clip-btn", n_clicks=0),
+                dcc.Store(id="video-urls", data=urls)
+            ])
+        
+

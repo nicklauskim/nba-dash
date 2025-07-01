@@ -22,5 +22,10 @@ class FilterRequest(BaseModel):
     # sub_type: Optional[str] = None
     # shot_type: Optional[str] = None
     # shot_zone_area: Optional[str] = None
+    two_three: Optional[str] = None
+    quarter: Optional[int] = None
+    start_gametime: Optional[str] = None
+    end_gametime: Optional[str] = None
+    margin: Optional[int] = None
 
 

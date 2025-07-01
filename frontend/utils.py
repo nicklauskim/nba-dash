@@ -6,17 +6,33 @@ import plotly.express as px
 from scipy.stats import gaussian_kde
 
 
+import plotly.io as pio
+
+pio.templates["custom"] = pio.templates["plotly_white"]
+pio.templates["custom"].layout.font.family = "Poppins"
+pio.templates["custom"].layout.font.color = "#0f1e3d"
+pio.templates["custom"].layout.colorway = ["#0372e8", "#2ca02c", "#ff7f0e"]
+
+
+
+
 def formatted_table(data):
     pass
 
 
-def draw_nba_half_court():
-    fig = go.Figure()
+def draw_nba_half_court(fig=None):
+    if fig is None:
+        fig = go.Figure()
 
     fig.update_layout(
+        template="custom",
         plot_bgcolor="#F8F8F8",
         autosize=False,
-        font=dict(family="Inter", size=14),
+        font=dict(
+            family="Poppins, sans-serif",
+            size=14,
+            color="#0f1e3d"
+        ),
         height=650, width=650,
         xaxis=dict(
             visible=False,
@@ -127,7 +143,7 @@ def draw_nba_half_court():
 
 
 def plot_events(df, fig, title="Play Chart", **kwargs):
-    x = df['xlegacy']
+    x = -df['xlegacy']
     y = df['ylegacy'] + 40  # Align with half-court
 
     fig.add_trace(go.Scatter(
@@ -141,26 +157,27 @@ def plot_events(df, fig, title="Play Chart", **kwargs):
     ))
 
     fig.update_layout(
+        template="custom",
         title=dict(
             text=title,
             x=0.5,
             xanchor="center",
-            font=dict(size=20, family='Inter')
+            font=dict(
+                size=20,
+            )
         )
     )
 
     return fig
 
 
-def shot_type_heatmap(df, fig, title="Play Location Density Heatmap", **kwargs):
-    from scipy.stats import gaussian_kde
-    import numpy as np
-    import plotly.graph_objects as go
-
+def shot_type_heatmap(df, title="Play Location Density Heatmap", **kwargs):
     df = df.rename(columns={'xlegacy': 'X', 'ylegacy': 'Y'})
-    df['Y'] += 40  # Align with half-court layout
 
     df = df[(df['X'] >= -250) & (df['X'] <= 250) & (df['Y'] >= 0) & (df['Y'] <= 470)]
+
+    df['X'] = -df['X']  # Flip x-axis to match NBA court layout
+    df['Y'] += 40  # Align with half-court layout
 
     x = df['X'].values
     y = df['Y'].values
@@ -193,7 +210,10 @@ def shot_type_heatmap(df, fig, title="Play Location Density Heatmap", **kwargs):
         **kwargs
     ))
 
+    fig = draw_nba_half_court(fig)
+
     fig.update_layout(
+        template="custom",
         autosize=False,
         height=650,
         width=650,
@@ -211,12 +231,16 @@ def shot_type_heatmap(df, fig, title="Play Location Density Heatmap", **kwargs):
             fixedrange=True
         ),
         plot_bgcolor='white',
-        font=dict(family="Inter", size=14),
+        font=dict(
+            family="Poppins, sans-serif",
+            size=14,
+            color="#0f1e3d"
+        ),
         title=dict(
             text=title,
             x=0.5,
             xanchor='center',
-            font=dict(size=20, family='Inter')
+            font=dict(size=20)
         )
     )
 
@@ -229,17 +253,21 @@ def shot_type_bar_chart(df, **kwargs):
 
 
 
+def shot_distance_bar_chart(df, **kwargs):
+    pass
 
-def scoring_timeline(df):
-    df_sorted = df.sort_values(by="game_minute")
-    df_sorted["cumulative_points"] = df_sorted["points"].cumsum()
+
+
+# def scoring_timeline(df):
+#     df_sorted = df.sort_values(by="game_minute")
+#     df_sorted["cumulative_points"] = df_sorted["points"].cumsum()
     
-    fig = px.line(
-        df_sorted, 
-        x="game_minute", 
-        y="cumulative_points", 
-        title="Scoring Timeline",
-        labels={"game_minute": "Game Minute", "cumulative_points": "Cumulative Points"}
-    )
-    return fig
+#     fig = px.line(
+#         df_sorted, 
+#         x="game_minute", 
+#         y="cumulative_points", 
+#         title="Scoring Timeline",
+#         labels={"game_minute": "Game Minute", "cumulative_points": "Cumulative Points"}
+#     )
+#     return fig
 
